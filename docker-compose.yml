@@ -1,0 +1,137 @@
+version: '3.5'
+
+networks:
+  proxy-tier:
+    name: proxy-tier
+
+services:
+  db-redis:
+    image: solardesigner/redismod:latest
+    container_name: db-redis
+    command: sh -c "chown -R redis:redis /tmp/redis && redis-server /usr/local/etc/redis/redis.conf --loadmodule /usr/lib/redis/modules/rejson.so --loadmodule /usr/lib/redis/modules/redistimeseries.so --loadmodule /usr/lib/redis/modules/rebloom.so --loadmodule /usr/lib/redis/modules/redisgears.so PythonHomeDir /usr/lib/redis/modules/deps/cpython/"
+    expose:
+      - 6379
+    ports:
+      - 6379:6379
+    networks:
+      - proxy-tier
+    restart: always
+    sysctls:
+      - net.core.somaxconn=511
+    volumes:
+      - db-redis-data:/data
+      - db-redis-sock:/tmp/redis:rw
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+
+  db-redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: db-redis-exporter
+    environment:
+      - REDIS_ADDR=db-redis:6379
+      - 'REDIS_ADDR=unix://tmp/redis/redis.sock'
+    expose:
+      - 9121
+    networks:
+      - proxy-tier
+    restart: always
+    volumes:
+      - db-redis-sock:/tmp/redis
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=1d'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    ports:
+      - 9090:9090
+    networks:
+      - proxy-tier
+    restart: always
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+
+  nodeexporter:
+    image: prom/node-exporter:latest
+    container_name: nodeexporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    expose:
+      - 9100
+    ports:
+      - 9100:9100
+    networks:
+      - proxy-tier
+    privileged: true
+    restart: always
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    command:
+      - '--enable_load_reader=false'
+      - '--storage_duration=2m0s'
+    expose:
+      - 8080
+    ports:
+      - 8090:8080
+    networks:
+      - proxy-tier
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /dev/disk/:/dev/disk:ro
+      - /sys:/sys:ro
+      - /var/run:/var/run:rw
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_USERS_ALLOW_SIGN_UP=false
+    expose:
+      - 3000
+    ports:
+      - 3000:3000
+    networks:
+      - proxy-tier
+    restart: always
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - grafana_logs:/var/log/grafana
+      - grafana_etc:/etc/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+
+volumes:
+  db-redis-data:
+    name: db-redis-data
+    driver: local
+  db-redis-sock:
+    name: db-redis-sock
+    driver: local
+  grafana_data:
+    driver: local
+    name: grafana_data
+  grafana_logs:
+    driver: local
+    name: grafana_logs
+  grafana_etc:
+    driver: local
+    name: grafana_etc
+  prometheus_data:
+    driver: local
+    name: prometheus_data
