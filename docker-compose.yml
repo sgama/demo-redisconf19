@@ -5,37 +5,37 @@ networks:
     name: proxy-tier
 
 services:
-  db-redis:
-    image: solardesigner/redismod:latest
-    container_name: db-redis
-    command: sh -c "chown -R redis:redis /tmp/redis && redis-server /usr/local/etc/redis/redis.conf --loadmodule /usr/lib/redis/modules/rejson.so --loadmodule /usr/lib/redis/modules/redistimeseries.so --loadmodule /usr/lib/redis/modules/rebloom.so --loadmodule /usr/lib/redis/modules/redisgears.so PythonHomeDir /usr/lib/redis/modules/deps/cpython/"
-    expose:
-      - 6379
-    ports:
-      - 6379:6379
-    networks:
-      - proxy-tier
-    restart: always
-    sysctls:
-      - net.core.somaxconn=511
-    volumes:
-      - db-redis-data:/data
-      - db-redis-sock:/tmp/redis:rw
-      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+  # db-redis:
+  #   image: solardesigner/redismod:latest
+  #   container_name: db-redis
+  #   command: sh -c "chown -R redis:redis /tmp/redis && redis-server /usr/local/etc/redis/redis.conf --loadmodule /usr/lib/redis/modules/rejson.so --loadmodule /usr/lib/redis/modules/redistimeseries.so --loadmodule /usr/lib/redis/modules/rebloom.so --loadmodule /usr/lib/redis/modules/redisgears.so PythonHomeDir /usr/lib/redis/modules/deps/cpython/"
+  #   expose:
+  #     - 6379
+  #   ports:
+  #     - 6379:6379
+  #   networks:
+  #     - proxy-tier
+  #   restart: always
+  #   sysctls:
+  #     - net.core.somaxconn=511
+  #   volumes:
+  #     - db-redis-data:/data
+  #     - db-redis-sock:/tmp/redis:rw
+  #     - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
 
-  db-redis-exporter:
-    image: oliver006/redis_exporter:latest
-    container_name: db-redis-exporter
-    environment:
-      - REDIS_ADDR=db-redis:6379
-      - 'REDIS_ADDR=unix://tmp/redis/redis.sock'
-    expose:
-      - 9121
-    networks:
-      - proxy-tier
-    restart: always
-    volumes:
-      - db-redis-sock:/tmp/redis
+  # db-redis-exporter:
+  #   image: oliver006/redis_exporter:latest
+  #   container_name: db-redis-exporter
+  #   environment:
+  #     - REDIS_ADDR=db-redis:6379
+  #     - 'REDIS_ADDR=unix://tmp/redis/redis.sock'
+  #   expose:
+  #     - 9121
+  #   networks:
+  #     - proxy-tier
+  #   restart: always
+  #   volumes:
+  #     - db-redis-sock:/tmp/redis
 
   prometheus:
     image: prom/prometheus:latest
@@ -100,9 +100,14 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     environment:
+      - GF_USERS_SIGNUP=false
+      - GF_ALLOW_ORG_CREATE=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_AUTH_BASIC_ENABLED=false
       - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
     expose:
       - 3000
     ports:
